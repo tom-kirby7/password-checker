@@ -3,6 +3,7 @@ from ttkbootstrap import Style
 from tkinter import ttk
 import math
 
+
 style = Style()
 style = Style('cosmo')
 root = style.master
@@ -70,28 +71,161 @@ def calculate_entropy(password):
     return entropy
 
 def calculate_strength(password):
-    length = length_score(password)
-    variety = variety_score(password)
-    total_strength = length + variety
+    length = length_score(password) * 0.2  # Weight: 20%
+    variety = variety_score(password) * 0.4  # Weight: 40%
+    entropy = calculate_entropy(password) * 0.3  # Weight: 30%
+    pattern = repetition_and_pattern_score(password) * 0.1  # Weight: 10%
 
-    if total_strength <= 0:
-        return "Enter a password"
-    elif total_strength <= 5:   
+    total_strength = length + variety + entropy + pattern
+
+    # Stricter thresholds for password categories
+    if total_strength <= 10:
         return "Weak"
-    elif total_strength <= 10:
+    elif total_strength <= 25:
         return "Moderate"
-    elif total_strength <= 15:
+    elif total_strength <= 40:
         return "Strong"
     else:
         return "Very Strong"
+
+
+
+# List of prohibited passwords
+prohibited_passwords = ["123456", "password", "123456789", "qwerty", "abc123", "password1", "123123"]
 
 def check_password():
     password = password_entry.get()
     strength = calculate_strength(password)
     result_label.config(text=f"Password Strength: {strength}")
+    
+def check_password():
+    password = password_entry.get()
+
+    # Check if password is in the prohibited list
+    if password in prohibited_passwords:
+        result_label.config(text="❌ This password is too common. Choose a different one.")
+        return
+
+    # Calculate strength if allowed
+    strength = calculate_strength(password)
+    result_label.config(text=f"✅ Password Strength: {strength}")
 
 
-password_entry = ttk.Entry(root, show="9", width=30)
+
+from collections import Counter
+
+def repetition_and_pattern_score(password):
+    if not password:
+        return 0
+
+    password_lower = password.lower()
+
+    # ------------------------
+    # 🔁 1. Repetition Check
+    # ------------------------
+    counts = Counter(password_lower)
+    most_common = counts.most_common(1)[0][1]  # how many times the most common char appears
+
+    length = len(password)
+    repetition_ratio = most_common / length
+
+    # The higher the repetition ratio, the lower the score
+    if repetition_ratio >= 0.6:
+        rep_score = 2
+    elif repetition_ratio >= 0.4:
+        rep_score = 4
+    elif repetition_ratio >= 0.3:
+        rep_score = 6
+    elif repetition_ratio >= 0.2:
+        rep_score = 8
+    else:
+        rep_score = 10
+
+    # ------------------------
+    # 🔢 2. Pattern Check
+    # ------------------------
+    common_patterns = [
+        "1234", "2345", "3456", "4567", "5678", "6789",
+        "abcd", "bcde", "cdef", "qwerty", "asdf", "zxcv",
+        "password", "letmein", "admin", "iloveyou", "welcome"
+    ]
+
+    pattern_found = any(pat in password_lower for pat in common_patterns)
+
+    if pattern_found:
+        pat_score = 3  # big penalty
+    else:
+        pat_score = 10
+
+    # ------------------------
+    # ✅ Final Score
+    # ------------------------
+    # Use the lower of the two scores (bad repetition or bad pattern → bad password)
+    final_score = min(rep_score, pat_score)
+    return final_score
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+def open_about_window():
+    about_window = ttk.Toplevel(root)  # Create a new top-level window
+    about_window.title("About")
+    about_window.geometry("300x150")
+    about_window.configure(background="black")
+
+    # Add content to the About window
+    about_label = ttk.Label(
+        about_window,
+        text="Password Checker v1.0\nCreated by Tom Kirby",
+        font=("Segoe UI", 12),
+        foreground="white",
+        background="black"
+    )
+    about_label.pack(pady=20)
+
+    close_button = ttk.Button(
+        about_window,
+        text="Close",
+        command=about_window.destroy,
+        style='danger.TButton'
+    )
+    close_button.pack(pady=10)
+
+
+password_entry = ttk.Entry(root, show="*", width=30)
 password_entry.pack(pady=5)
 
 check_button = ttk.Button(root, text="Check Password", command=check_password, style='secondary.TButton')
@@ -103,5 +237,5 @@ result_label.pack(pady=5)
 
 window = style.master
 ttk.Button(window, text="Help", style='secondary.TButton').pack(side='left', padx=5, pady=10)
-ttk.Button(window, text="About", style='success.Outline.TButton').pack(side='left', padx=5, pady=10)
+ttk.Button(window, text="About", command=open_about_window,  style='success.Outline.TButton').pack(side='left', padx=5, pady=10)
 window.mainloop()
