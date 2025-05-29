@@ -1,195 +1,154 @@
 import ttkbootstrap as ttk
-from ttkbootstrap import Style
 from ttkbootstrap.constants import *
 import math
 
-
-root = ttk.Window(themename="superhero")  # Use 'flatly' theme for a modern look
+# --- Window Setup ---
+root = ttk.Window(themename="journal")
 root.title("Tom Kirby's Password Checker")
-root.configure(background="black")
+root.geometry("600x300")
 root.minsize(200, 200)
 root.maxsize(1000, 1000)
-root.geometry("600x300")
- 
 
-def length_score(password):
+# --- Load Prohibited Passwords ---
+def load_prohibited_passwords(filename):
+    try:
+        with open(filename, 'r', encoding='utf-8', errors='ignore') as file:
+            return set(line.strip() for line in file if line.strip())
+    except FileNotFoundError:
+        print(f"Warning: '{filename}' not found.")
+        return set()
+
+prohibited_passwords = load_prohibited_passwords('prohibited.txt')
+
+# --- Scoring Functions ---
+def score_length(password):
     length = len(password)
-    if length == 0:
-        return 0
-    elif length <= 4:
-        return 2
-    elif length <= 7:
-        return 4
-    elif length <= 10:
-        return 6
-    elif length <= 14:
-        return 8
-    else:
-        return 10
+    return min(length * 0.5, 10)  # Max 10 points
 
-def variety_score(password):
+def score_variety(password):
     has_lower = any(c.islower() for c in password)
     has_upper = any(c.isupper() for c in password)
     has_digit = any(c.isdigit() for c in password)
     has_symbol = any(not c.isalnum() for c in password)
     types_used = sum([has_lower, has_upper, has_digit, has_symbol])
+    return {1: 2.5, 2: 5, 3: 7.5, 4: 10}.get(types_used, 0)
 
-    if types_used == 1:
-        return 2
-    elif types_used == 2:
-        return 5
-    elif types_used == 3:
-        return 8
-    elif types_used == 4:
-        return 10
-    return 0
-
-def calculate_entropy(password):
-    escore = 0
-    if any(c.islower() for c in password): escore += 26
-    if any(c.isupper() for c in password): escore += 26
-    if any(c.isdigit() for c in password): escore += 10
-    if any(not c.isalnum() for c in password): escore += 33
-    if escore == 0 or len(password) == 0:
+def score_entropy(password):
+    charset_size = 0
+    if any(c.islower() for c in password): charset_size += 26
+    if any(c.isupper() for c in password): charset_size += 26
+    if any(c.isdigit() for c in password): charset_size += 10
+    if any(not c.isalnum() for c in password): charset_size += 33
+    if charset_size == 0 or len(password) == 0:
         return 0
-    return len(password) * math.log2(escore)
+    entropy = len(password) * math.log2(charset_size)
+    return min(entropy / 6, 10)  # Normalize to 10
 
-def calculate_strength(password):
-    length = length_score(password)
-    variety = variety_score(password)
-    total_strength = length + variety
-    if total_strength <= 0:
-        return "Enter a password"
-    elif total_strength <= 5:
+def score_keyboard_sequence(password):
+    common_seqs = ["123", "234", "345", "abc", "qwe", "asd", "password"]
+    return -5 if any(seq in password.lower() for seq in common_seqs) else 0
+
+def total_score(password):
+    return (
+        score_length(password) * 0.3 +
+        score_variety(password) * 0.3 +
+        score_entropy(password) * 0.3 +
+        score_keyboard_sequence(password) * 0.1
+    )
+
+def strength_label(score):
+    if score <= 3:
+        return "Very Weak"
+    elif score <= 5:
         return "Weak"
-    elif total_strength <= 10:
+    elif score <= 7:
         return "Moderate"
-    elif total_strength <= 15:
+    elif score <= 8.5:
         return "Strong"
     else:
         return "Very Strong"
 
-# -------------------------
-# Load prohibited passwords
-# -------------------------
-
-def load_prohibited_passwords(filename):
-    with open(filename, 'r', encoding='utf-8', errors='ignore') as file:
-        return set(line.strip() for line in file if line.strip())
-
-prohibited_passwords = load_prohibited_passwords('prohibited.txt')
-
-# -------------------------
-# Password check function
-# -------------------------
-# Removed global percentage calculation as total_strength is not defined globally
-
+# --- Meter Update ---
 def update_meter(percentage):
-    # Update the meter widget with the calculated percentage
     meter_widget.configure(amountused=percentage)
-    meter_widget.configure(subtext=f"{percentage:.0f}% Strength")  # Display percentage as subtext
+    meter_widget.configure(subtext=f"{percentage:.0f}% Strength")
 
+# --- Password Evaluation ---
 def check_password():
     password = password_entry.get()
     if not password:
         result_label.config(text="❌ Please enter a password.")
-        update_meter(0)  # Update meter for empty password
+        update_meter(0)
         return
+
     if password in prohibited_passwords:
         result_label.config(text="❌ This password is too common or not allowed.")
-        update_meter(0)  # Update meter for prohibited password
+        update_meter(0)
         return
-    strength = calculate_strength(password)
-    percentage = (length_score(password) + variety_score(password)) / 20 * 100  # Calculate percentage locally
-    result_label.config(text=f"Password Strength: {strength}")
-    update_meter(percentage)  # Update meter based on calculated percentage
 
-# -------------------------
-# GUI Widgets
-# -------------------------
+    score = total_score(password)
+    label = strength_label(score)
+    result_label.config(text=f"Password Strength: {label}")
+    update_meter(min(score * 10, 100))  # Scale score to percentage
+
+# --- Help/About Windows ---
 def open_help_window():
-    help_window = ttk.Toplevel(root)  # Create a new top-level window
+    help_window = ttk.Toplevel(root)
     help_window.title("Help")
     help_window.geometry("300x200")
-    help_window.configure(background="black")  # Set background color
 
-    # Add content to the Help window
-    help_label = ttk.Label(
-        help_window,
-        text="Enter a password to check its strength.\n"
-             "The app checks for length, variety,\n"
-             "and common passwords.",
-        font=("Segoe UI", 10),
-        background="black"
+    help_text = (
+        "Enter a password to check its strength.\n"
+        "Scoring is based on:\n"
+        "- Length\n"
+        "- Character Variety\n"
+        "- Entropy (Randomness)\n"
+        "- Avoiding common sequences\n"
+        "- Avoiding common passwords"
     )
-    help_label.pack(expand=True, pady=20)
 
-    # Add a close button
-    close_button = ttk.Button(
-        help_window,
-        text="Close",
-        command=help_window.destroy,
-        bootstyle=SUCCESS
-    )
-    close_button.pack(pady=10)
+    ttk.Label(help_window, text=help_text, font=("Segoe UI", 10), anchor="center", justify="center").pack(expand=True, pady=20)
+    ttk.Button(help_window, text="Close", command=help_window.destroy, bootstyle="primary").pack(pady=10)
+
 def open_about_window():
-    about_window = ttk.Toplevel(root)  # Create a new top-level window
+    about_window = ttk.Toplevel(root)
     about_window.title("About")
     about_window.geometry("300x150")
-    about_window.configure(background="black")  # Set background color
 
-    # Add content to the About window
-    about_label = ttk.Label(
-        about_window,
-        text="Tom Kirby's Password Checker\nVersion 1.0\nThis app checks password strength\nand prevents common passwords.",
-        font=("Segoe UI", 10),
-        background="black"
+    about_text = (
+        "Tom Kirby's Password Checker\n"
+        "Version 1.1\n\n"
+        "Checks password strength\n"
+        "based on modern standards."
     )
-    about_label.pack(expand=True, pady=20)
 
-    # Add a close button
-    close_button = ttk.Button(
-        about_window,
-        text="Close",
-        command=about_window.destroy,
-        bootstyle=SUCCESS
-    )
-    close_button.pack(pady=10)
+    ttk.Label(about_window, text=about_text, font=("Segoe UI", 10), anchor="center", justify="center").pack(expand=True, pady=20)
+    ttk.Button(about_window, text="Close", command=about_window.destroy, bootstyle="primary").pack(pady=10)
 
-password_entry = ttk.Entry(root, show="*", width=30)
+# --- UI Layout ---
+password_entry = ttk.Entry(root, show="*", width=30, bootstyle="default")
 password_entry.pack(pady=5)
 
-check_button = ttk.Button(root, text="Check Password", command=check_password, bootstyle=SUCCESS)
-check_button.pack(pady=5)
+ttk.Button(root, text="Check Password", command=check_password, bootstyle="primary").pack(pady=5)
 
-# Adjust the position of the strength label
-result_label = ttk.Label(
-    root,
-    text="Password Strength:",
-    font=("Segoe UI", 14),
-    foreground="white",
-    background=root.cget("background"),
-    anchor="w"  # Align text to the left
-)
-result_label.pack(pady=5, padx=10, fill="x")  # Adjust padding and fill horizontally
+result_label = ttk.Label(root, text="Password Strength:", font=("Segoe UI", 14), anchor="center", justify="center")
+result_label.pack(pady=5, padx=10, fill="x")
 
-# Add a meter widget to display password strength percentage
 meter_widget = ttk.Meter(
     root,
-    metersize=150,  # Increased size
+    metersize=150,
     amountused=0,
     amounttotal=100,
-    bootstyle="primary",  # Changed style to remove blue box
-    subtext="Strength Meter",
+    bootstyle="primary",
+    subtext="Strength Meter"
 )
-meter_widget.pack(side='bottom', anchor='e', pady=10, padx=10)  # Positioned at the bottom-right
+meter_widget.pack(side='bottom', anchor='se', pady=10, padx=10)
 
-# Create a frame to hold the "About" and "Help" buttons at the bottom-left
 button_frame = ttk.Frame(root)
 button_frame.pack(side='bottom', anchor='w', pady=10, padx=10)
 
-# Add the "Help" and "About" buttons to the frame
-ttk.Button(button_frame, text="Help", command=open_help_window, bootstyle=SECONDARY).pack(side='left', padx=5)
-ttk.Button(button_frame, text="About", command=open_about_window, bootstyle=SUCCESS).pack(side='left', padx=5)
+ttk.Button(button_frame, text="Help", command=open_help_window, bootstyle="secondary").pack(side='left', padx=5)
+ttk.Button(button_frame, text="About", command=open_about_window, bootstyle="secondary").pack(side='left', padx=5)
 
+# --- Start App ---
 root.mainloop()
