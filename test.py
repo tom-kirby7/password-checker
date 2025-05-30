@@ -4,12 +4,19 @@ import math
 import random
 import string
 
-# --- Window Setup ---
 root = ttk.Window(themename="journal")
 root.title("Tom Kirby's Password Checker")
-root.geometry("600x350")  # increased height for the new button
-root.minsize(200, 200)
-root.maxsize(1000, 1000)
+root.geometry("650x450")
+root.minsize(450, 350)
+
+# --- Style for sequence bar coloring ---
+style = ttk.Style()
+style.configure("green.Horizontal.TProgressbar", troughcolor="white", background="green")
+style.configure("danger.Horizontal.TProgressbar", troughcolor="white", background="red")
+
+# --- Variables ---
+mode_var = ttk.StringVar(value="Medium")  # Password generation mode
+length_var = ttk.IntVar(value=12)         # Password length
 
 # --- Load Prohibited Passwords ---
 def load_prohibited_passwords(filename):
@@ -23,9 +30,8 @@ def load_prohibited_passwords(filename):
 prohibited_passwords = load_prohibited_passwords('prohibited.txt')
 
 # --- Scoring Functions ---
-def score_length(password):
-    length = len(password)
-    return min(length * 0.5, 10)  # Max 10 points
+def score_length(password): 
+    return min(len(password) * 0.5, 10)
 
 def score_variety(password):
     has_lower = any(c.islower() for c in password)
@@ -41,99 +47,90 @@ def score_entropy(password):
     if any(c.isupper() for c in password): charset_size += 26
     if any(c.isdigit() for c in password): charset_size += 10
     if any(not c.isalnum() for c in password): charset_size += 33
-    if charset_size == 0 or len(password) == 0:
-        return 0
+    if charset_size == 0 or len(password) == 0: return 0
     entropy = len(password) * math.log2(charset_size)
-    return min(entropy / 6, 10)  # Normalize to 10
+    return min(entropy / 6, 10)
 
 def score_keyboard_sequence(password):
+    # Returns penalty magnitude (positive number) if sequences found
     common_seqs = ["123", "234", "345", "abc", "qwe", "asd", "password"]
-    return -5 if any(seq in password.lower() for seq in common_seqs) else 0
+    for seq in common_seqs:
+        if seq in password.lower():
+            return 5  # Penalty magnitude
+    return 0  # No penalty
 
 def total_score(password):
-    return (
-        score_length(password) * 0.3 +
-        score_variety(password) * 0.3 +
-        score_entropy(password) * 0.3 +
-        score_keyboard_sequence(password) * 0.1
-    )
+    len_s = score_length(password)
+    var_s = score_variety(password)
+    ent_s = score_entropy(password)
+    seq_penalty = score_keyboard_sequence(password)
+
+    # Total score = positive factors - penalty, weighted
+    return (len_s * 0.3 + var_s * 0.3 + ent_s * 0.3) - (seq_penalty * 0.1)
 
 def strength_label(score):
-    if score <= 3:
-        return "Very Weak"
-    elif score <= 5:
-        return "Weak"
-    elif score <= 7:
-        return "Moderate"
-    elif score <= 8.5:
-        return "Strong"
-    else:
-        return "Very Strong"
+    if score <= 3: return "Very Weak"
+    elif score <= 5: return "Weak"
+    elif score <= 7: return "Moderate"
+    elif score <= 8.5: return "Strong"
+    else: return "Very Strong"
 
-# --- UI Variables for Mode and Length ---
-mode_var = ttk.StringVar(value="Strong")  # Default to Strong
-length_var = ttk.IntVar(value=16)          # Integer var for length display and logic
-scale_var = ttk.DoubleVar(value=16)        # Double var for the scale widget
-
-# Update length_var when scale moves, cast to int to avoid floats and lag
-def on_scale_change(event=None):
-    length_var.set(int(scale_var.get()))
-
-# --- Password Generation ---
-def generate_strong_password():
+# --- Password Generator ---
+def perform_generate_password():
     mode = mode_var.get()
     length = length_var.get()
 
-    # Define requirements per mode (lower, upper, digit, symbol, min score)
-    mode_settings = {
-        "Easy":    (1, 0, 0, 0, 3.0),  # Easy: minimal requirements, low score threshold
-        "Medium":  (1, 1, 1, 0, 5.5),  # Medium: some uppercase/digits, moderate score
-        "Strong":  (2, 2, 2, 2, 7.5),  # Strong: high char type requirements and high score
-    }
-
-    lower_req, upper_req, digit_req, symbol_req, min_score = mode_settings[mode]
-
-    # Enforce minimum length per mode
-    min_len_per_mode = {
-        "Easy": 6,
-        "Medium": 8,
-        "Strong": 12,
-    }
-    if length < min_len_per_mode[mode]:
-        length = min_len_per_mode[mode]
-        length_var.set(length)
-        scale_var.set(length)
-        result_label.config(text=f"⚠️ Length increased to minimum {length} for {mode} mode.")
-
-    total_required = lower_req + upper_req + digit_req + symbol_req
-    if length < total_required:
-        result_label.config(text=f"⚠️ Length must be at least {total_required} for {mode} mode.")
-        update_meter(0)
-        return
+    if mode == "Easy":
+        charset = string.ascii_lowercase
+        min_types = 1
+        min_score = 2.5
+    elif mode == "Medium":
+        charset = string.ascii_letters + string.digits
+        min_types = 2
+        min_score = 5.5
+    else:  # Hard
+        charset = string.ascii_letters + string.digits + "!@#$%^&*()-_=+[]{}|;:,.<>?"
+        min_types = 4
+        min_score = 7.5
 
     attempts = 0
     while attempts < 100:
         attempts += 1
+        password_chars = []
 
-        lower = random.choices(string.ascii_lowercase, k=lower_req)
-        upper = random.choices(string.ascii_uppercase, k=upper_req)
-        digits = random.choices(string.digits, k=digit_req)
-        symbols = random.choices("!@#$%^&*()-_=+[]{}|;:,.<>?", k=symbol_req)
+        if mode == "Easy":
+            password_chars += random.choices(string.ascii_lowercase, k=length)
+        elif mode == "Medium":
+            password_chars += random.choices(string.ascii_lowercase, k=max(1, length // 3))
+            password_chars += random.choices(string.ascii_uppercase, k=max(1, length // 4))
+            password_chars += random.choices(string.digits, k=max(1, length // 4))
+            remaining = length - len(password_chars)
+            password_chars += random.choices(charset, k=remaining)
+        else:
+            reqs = {
+                string.ascii_lowercase: 2,
+                string.ascii_uppercase: 2,
+                string.digits: 2,
+                "!@#$%^&*()-_=+[]{}|;:,.<>?": 2,
+            }
+            for chars, count in reqs.items():
+                password_chars += random.choices(chars, k=count)
+            remaining = length - len(password_chars)
+            password_chars += random.choices(charset, k=remaining)
 
-        remaining_len = length - total_required
-        extras = random.choices(
-            string.ascii_letters + string.digits + "!@#$%^&*()-_=+[]{}|;:,.<>?", 
-            k=remaining_len
-        )
+        random.shuffle(password_chars)
+        password = ''.join(password_chars[:length])
 
-        password_list = lower + upper + digits + symbols + extras
-        random.shuffle(password_list)
-        password = ''.join(password_list)
+        if password in prohibited_passwords: continue
+        if any(seq in password.lower() for seq in ["123", "abc", "password", "qwe"]): continue
 
-        if password in prohibited_passwords:
-            continue
-        if any(seq in password.lower() for seq in ["123", "234", "345", "abc", "qwe", "asd", "password"]):
-            continue
+        types_used = sum([
+            any(c.islower() for c in password),
+            any(c.isupper() for c in password),
+            any(c.isdigit() for c in password),
+            any(not c.isalnum() for c in password),
+        ])
+        if types_used < min_types: continue
 
         score = total_score(password)
         if score >= min_score:
@@ -144,7 +141,6 @@ def generate_strong_password():
 
     result_label.config(text="⚠️ Couldn't generate a password meeting the criteria. Try again.")
     update_meter(0)
-
 
 # --- Meter Update ---
 def update_meter(percentage):
@@ -157,110 +153,117 @@ def check_password():
     if not password:
         result_label.config(text="❌ Please enter a password.")
         update_meter(0)
+        clear_category_scores()
         return
 
     if password in prohibited_passwords:
         result_label.config(text="❌ This password is too common or not allowed.")
         update_meter(0)
+        clear_category_scores()
         return
+
+    len_score = score_length(password)
+    var_score = score_variety(password)
+    ent_score = score_entropy(password)
+    seq_penalty = score_keyboard_sequence(password)
 
     score = total_score(password)
     label = strength_label(score)
     result_label.config(text=f"Password Strength: {label}")
-    update_meter(min(score * 10, 100))  # Scale score to percentage
+    update_meter(min(max(score * 10, 0), 100))
 
-# --- Help/About Windows ---
-def open_help_window():
-    help_window = ttk.Toplevel(root)
-    help_window.title("Help")
-    help_window.geometry("300x200")
+    update_category_scores(len_score, var_score, ent_score, seq_penalty)
 
-    help_text = (
-        "Enter a password to check its strength.\n"
-        "Scoring is based on:\n"
-        "- Length\n"
-        "- Character Variety\n"
-        "- Entropy (Randomness)\n"
-        "- Avoiding common sequences\n"
-        "- Avoiding common passwords"
-    )
+def clear_category_scores():
+    for bar in [length_bar, variety_bar, entropy_bar, sequence_bar]:
+        bar.configure(value=0, style="green.Horizontal.TProgressbar")
+    for label in [length_score_label, variety_score_label, entropy_score_label, sequence_score_label]:
+        label.config(text="0")
 
-    ttk.Label(help_window, text=help_text, font=("Segoe UI", 10), anchor="center", justify="center").pack(expand=True, pady=20)
-    ttk.Button(help_window, text="Close", command=help_window.destroy, bootstyle="primary").pack(pady=10)
+def update_category_scores(len_score, var_score, ent_score, seq_penalty):
+    length_bar.configure(value=len_score)
+    variety_bar.configure(value=var_score)
+    entropy_bar.configure(value=ent_score)
 
-def open_about_window():
-    about_window = ttk.Toplevel(root)
-    about_window.title("About")
-    about_window.geometry("300x150")
+    # Show penalty magnitude on sequence bar
+    sequence_bar.configure(value=seq_penalty)
+    if seq_penalty == 0:
+        sequence_bar.configure(style="green.Horizontal.TProgressbar")
+    else:
+        sequence_bar.configure(style="danger.Horizontal.TProgressbar")
 
-    about_text = (
-        "Tom Kirby's Password Checker\n"
-        "Version 1.1\n\n"
-        "Checks password strength\n"
-        "based on modern standards."
-    )
+    length_score_label.config(text=f"{int(len_score)}/10")
+    variety_score_label.config(text=f"{int(var_score)}/10")
+    entropy_score_label.config(text=f"{int(ent_score)}/10")
+    sequence_score_label.config(text=f"{int(seq_penalty)}/10 (Penalty)")
 
-    ttk.Label(about_window, text=about_text, font=("Segoe UI", 10), anchor="center", justify="center").pack(expand=True, pady=20)
-    ttk.Button(about_window, text="Close", command=about_window.destroy, bootstyle="primary").pack(pady=10)
+def copy_to_clipboard():
+    root.clipboard_clear()
+    root.clipboard_append(password_entry.get())
+    root.update()
+
+def toggle_password_visibility():
+    password_entry.configure(show="" if show_password_var.get() else "•")
 
 # --- UI Layout ---
+frame = ttk.Frame(root, padding=10)
+frame.pack(expand=True, fill=BOTH)
 
-password_entry = ttk.Entry(root, show="*", width=30, bootstyle="default")
-password_entry.pack(pady=5)
+# Password Entry
+ttk.Label(frame, text="Password:").grid(row=0, column=0, sticky=W, padx=(0,5))
+password_entry = ttk.Entry(frame, width=40, show="•")
+password_entry.grid(row=0, column=1, sticky=EW)
+password_entry.bind("<KeyRelease>", lambda e: check_password())
 
-def toggle_visibility():
-    if password_entry.cget('show') == '*':
-        password_entry.config(show='')
-    else:
-        password_entry.config(show='*')
+show_password_var = ttk.BooleanVar(value=False)
+show_password_cb = ttk.Checkbutton(frame, text="Show Password", variable=show_password_var, command=toggle_password_visibility)
+show_password_cb.grid(row=0, column=2, sticky=W, padx=10)
 
-ttk.Checkbutton(root, text="Show Password", command=toggle_visibility).pack(pady=2)
+generate_button = ttk.Button(frame, text="Generate Password", command=perform_generate_password)
+generate_button.grid(row=0, column=3, padx=10)
 
-ttk.Button(root, text="Check Password", command=check_password, bootstyle="primary").pack(pady=5)
+ttk.Label(frame, text="Mode:").grid(row=1, column=0, sticky=W, pady=(10,0))
+mode_options = ttk.Combobox(frame, textvariable=mode_var, values=["Easy", "Medium", "Hard"], state="readonly", width=10)
+mode_options.grid(row=1, column=1, sticky=W, pady=(10,0))
 
-# Add mode selection (Easy, Medium, Strong)
-mode_frame = ttk.Frame(root)
-mode_frame.pack(pady=5)
+ttk.Label(frame, text="Length:").grid(row=1, column=2, sticky=E, pady=(10,0))
+length_spinbox = ttk.Spinbox(frame, from_=6, to=32, textvariable=length_var, width=5)
+length_spinbox.grid(row=1, column=3, sticky=W, pady=(10,0))
 
-ttk.Label(mode_frame, text="Mode:").pack(side='left', padx=5)
-for m in ["Easy", "Medium", "Strong"]:
-    ttk.Radiobutton(mode_frame, text=m, variable=mode_var, value=m).pack(side='left')
+result_label = ttk.Label(frame, text="Enter a password to check strength.")
+result_label.grid(row=2, column=0, columnspan=4, sticky=W, pady=(10,0))
 
-# Add length selection slider with improved handling
-length_frame = ttk.Frame(root)
-length_frame.pack(pady=5)
+meter_widget = ttk.Meter(frame, length=300, amountused=0, subtext="0% Strength", bootstyle="success")
+meter_widget.grid(row=3, column=0, columnspan=4, pady=10)
 
-ttk.Label(length_frame, text="Length:").pack(side='left', padx=5)
+cat_frame = ttk.LabelFrame(frame, text="Category Scores (0-10 scale)", padding=10)
+cat_frame.grid(row=4, column=0, columnspan=4, sticky=EW, pady=(10,0))
 
-length_scale = ttk.Scale(length_frame, from_=6, to=32, variable=scale_var, orient='horizontal', length=150, command=lambda e: on_scale_change())
-length_scale.pack(side='left')
+ttk.Label(cat_frame, text="Length:").grid(row=0, column=0, sticky=W)
+length_bar = ttk.Progressbar(cat_frame, length=150, maximum=10, mode='determinate', style="green.Horizontal.TProgressbar")
+length_bar.grid(row=0, column=1, sticky=W, padx=(5,5))
+length_score_label = ttk.Label(cat_frame, text="0")
+length_score_label.grid(row=0, column=2, sticky=W)
 
-length_display = ttk.Label(length_frame, textvariable=length_var)
-length_display.pack(side='left', padx=5)
+ttk.Label(cat_frame, text="Variety:").grid(row=1, column=0, sticky=W)
+variety_bar = ttk.Progressbar(cat_frame, length=150, maximum=10, mode='determinate', style="green.Horizontal.TProgressbar")
+variety_bar.grid(row=1, column=1, sticky=W, padx=(5,5))
+variety_score_label = ttk.Label(cat_frame, text="0")
+variety_score_label.grid(row=1, column=2, sticky=W)
 
-result_label = ttk.Label(root, text="Password Strength:", font=("Segoe UI", 14), anchor="center", justify="center")
-result_label.pack(pady=5, padx=10, fill="x")
+ttk.Label(cat_frame, text="Entropy:").grid(row=2, column=0, sticky=W)
+entropy_bar = ttk.Progressbar(cat_frame, length=150, maximum=10, mode='determinate', style="green.Horizontal.TProgressbar")
+entropy_bar.grid(row=2, column=1, sticky=W, padx=(5,5))
+entropy_score_label = ttk.Label(cat_frame, text="0")
+entropy_score_label.grid(row=2, column=2, sticky=W)
 
-meter_widget = ttk.Meter(
-    root,
-    metersize=150,
-    amountused=0,
-    amounttotal=100,
-    bootstyle="primary",
-    subtext="Strength Meter"
-)
-meter_widget.pack(side='bottom', anchor='se', pady=10, padx=10)
+ttk.Label(cat_frame, text="Keyboard Sequence:").grid(row=3, column=0, sticky=W)
+sequence_bar = ttk.Progressbar(cat_frame, length=150, maximum=10, mode='determinate', style="green.Horizontal.TProgressbar")
+sequence_bar.grid(row=3, column=1, sticky=W, padx=(5,5))
+sequence_score_label = ttk.Label(cat_frame, text="0")
+sequence_score_label.grid(row=3, column=2, sticky=W)
 
-# Buttons frame for Help and About (fixed visibility & placement)
-button_frame = ttk.Frame(root)
-button_frame.pack(side='bottom', anchor='w', pady=10, padx=10)
+frame.columnconfigure(1, weight=1)
+cat_frame.columnconfigure(1, weight=1)
 
-ttk.Button(button_frame, text="Help", command=open_help_window, bootstyle="secondary").pack(side='left', padx=5)
-ttk.Button(button_frame, text="About", command=open_about_window, bootstyle="secondary").pack(side='left', padx=5)
-
-# Generate password button centered at bottom
-generate_button = ttk.Button(root, text="Generate Password", command=generate_strong_password, bootstyle="success")
-generate_button.pack(side='bottom', pady=10)
-
-# Start App
 root.mainloop()
