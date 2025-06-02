@@ -4,9 +4,9 @@ import math
 import random
 import string
 
-root = ttk.Window(themename="journal")
+root = ttk.Window(themename="cosmo")
 root.title("Tom Kirby's Password Checker")
-root.geometry("720x520")
+root.geometry("720x500")
 root.minsize(450, 350)
 
 # --- Variables ---
@@ -169,8 +169,6 @@ def perform_generate_password():
             return
 
     result_label.config(text="⚠️ Couldn't generate a password meeting the criteria. Try again.")
-    update_meter(0, "danger")
-
 # --- Meter Update ---
 def update_meter(score, style):
     percentage = (score / 30) * 100  # Adjust percentage calculation to reflect the total score accurately
@@ -211,7 +209,7 @@ def clear_category_scores():
                        (entropy_bar, entropy_score_label), 
                        (sequence_bar, sequence_score_label)]:
         bar.configure(value=0, bootstyle="secondary")
-        label.config(text="0")
+        label.configf(text="0")
 
 def update_category_scores(len_score, var_score, ent_score, seq_penalty):
     length_bar.configure(value=len_score, bootstyle=get_bootstyle(len_score))
@@ -319,15 +317,7 @@ mode_combo = ttk.Combobox(gen_frame, textvariable=mode_var, values=["Easy", "Med
 mode_combo.grid(row=0, column=1, sticky=W, padx=(5,15))
 
 ttk.Label(gen_frame, text="Length:").grid(row=0, column=2, sticky=W)
-length_slider = ttk.Scale(
-    gen_frame, 
-    from_=6, 
-    to=32, 
-    variable=length_var, 
-    orient=HORIZONTAL, 
-    length=160, 
-    command=lambda value: length_var.set(int(float(value)))  # Convert float to integer
-)
+length_slider = ttk.Scale(gen_frame, from_=6, to=32, variable=length_var, orient=HORIZONTAL, length=160)
 length_slider.grid(row=0, column=3, sticky=W, padx=(5,10))
 length_val_label = ttk.Label(gen_frame, textvariable=length_var, width=3)
 length_val_label.grid(row=0, column=4, sticky=W)
