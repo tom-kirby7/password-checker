@@ -211,7 +211,7 @@ def strengthen_password_to_strength(password, desired_strength):
     }
 
     target_percent = thresholds.get(desired_strength, 95)  # Default to "Very Strong"
-    score, *_ = total_score(password)
+    score, len_score, var_score, ent_score, seq_penalty = total_score(password)
     current_percent = (score / 30) * 100  # Convert score to percentage
 
     # Check if the password is already stronger than the desired mode
@@ -222,12 +222,32 @@ def strengthen_password_to_strength(password, desired_strength):
     attempts = 0
 
     while attempts < 50:  # Limit attempts to avoid infinite loops
-        score, *_ = total_score(strengthened_password)
+        score, len_score, var_score, ent_score, seq_penalty = total_score(strengthened_password)
         current_percent = (score / 30) * 100  # Convert score to percentage
+
         if current_percent >= target_percent:
             break
 
-        strengthened_password = strengthen_password(strengthened_password)
+        # Append characters based on missing components
+        if var_score < 10:
+            if not any(c.islower() for c in strengthened_password):
+                strengthened_password += random.choice(string.ascii_lowercase)
+            if not any(c.isupper() for c in strengthened_password):
+                strengthened_password += random.choice(string.ascii_uppercase)
+            if not any(c.isdigit() for c in strengthened_password):
+                strengthened_password += random.choice(string.digits)
+            if not any(not c.isalnum() for c in strengthened_password):
+                strengthened_password += random.choice("!@#$%^&*()-_=+[]{}|;:,.<>?")
+
+        # Improve entropy by appending random characters if needed
+        if ent_score < (target_percent / 10):  # Adjust entropy relative to the target strength
+            strengthened_password += ''.join(random.choices(string.ascii_letters + string.digits + "!@#$%^&*()-_=+[]{}|;:,.<>?", k=2))
+
+        # Ensure the password meets the minimum length relative to the target strength
+        min_length = 8 if target_percent <= 50 else 12  # Moderate and below: 8, Strong and above: 12
+        while len(strengthened_password) < min_length:
+            strengthened_password += random.choice(string.ascii_letters + string.digits)
+
         attempts += 1
 
     return strengthened_password
@@ -242,7 +262,7 @@ def show_strengthen_options():
     desired_strength = mode_var.get()
     options_window = ttk.Toplevel(root)
     options_window.title("Choose a Strengthened Password")
-    options_window.geometry("400x250")
+    options_window.geometry("500x300")  # Adjusted window size to fit all GUI elements
 
     ttk.Label(
         options_window, 
@@ -334,10 +354,16 @@ def clear_category_scores():
         label.config(text="0")
 
 def update_category_scores(len_score, var_score, ent_score, seq_penalty):
-    length_bar.configure(value=len_score, bootstyle=get_bootstyle(len_score))
-    variety_bar.configure(value=var_score, bootstyle=get_bootstyle(var_score))
-    entropy_bar.configure(value=ent_score, bootstyle=get_bootstyle(ent_score))
-    sequence_bar.configure(value=seq_penalty, bootstyle=get_bootstyle(seq_penalty, penalty=True))
+    """Update the UI for category scores with distinct colors."""
+    # Update length, variety, and entropy with light blue
+    length_bar.configure(value=len_score, bootstyle="info")
+    variety_bar.configure(value=var_score, bootstyle="info")
+    entropy_bar.configure(value=ent_score, bootstyle="info")
+
+    # Update sequence penalty with red
+    sequence_bar.configure(value=seq_penalty, bootstyle="danger")
+
+    # Update labels
     length_score_label.config(text=f"{int(len_score)}")
     variety_score_label.config(text=f"{int(var_score)}")
     entropy_score_label.config(text=f"{int(ent_score)}")
