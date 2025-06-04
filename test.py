@@ -202,9 +202,6 @@ def strengthen_password_to_strength(password, desired_strength):
     if not password:
         return "❌ Please provide a password to strengthen."
 
-    strengthened_password = password
-    attempts = 0
-
     # Define relative thresholds for each strength level
     thresholds = {
         "Weak": 30,  # 30% strength
@@ -214,10 +211,20 @@ def strengthen_password_to_strength(password, desired_strength):
     }
 
     target_percent = thresholds.get(desired_strength, 95)  # Default to "Very Strong"
+    score, *_ = total_score(password)
+    current_percent = (score / 30) * 100  # Convert score to percentage
+
+    # Check if the password is already stronger than the desired mode
+    if current_percent >= target_percent:
+        return f"⚠️ Password is already stronger than {desired_strength}."
+
+    strengthened_password = password
+    attempts = 0
+
     while attempts < 50:  # Limit attempts to avoid infinite loops
         score, *_ = total_score(strengthened_password)
-        percent = (score / 30) * 100  # Convert score to percentage
-        if percent >= target_percent:
+        current_percent = (score / 30) * 100  # Convert score to percentage
+        if current_percent >= target_percent:
             break
 
         strengthened_password = strengthen_password(strengthened_password)
@@ -243,11 +250,29 @@ def show_strengthen_options():
         font=("Segoe UI", 12)
     ).pack(pady=10)
 
+    # Check if the password is already stronger than the desired mode
+    result = strengthen_password_to_strength(current_password, desired_strength)
+    if result.startswith("⚠️"):
+        ttk.Label(
+            options_window, 
+            text=result, 
+            font=("Segoe UI", 10), 
+            foreground="red"
+        ).pack(pady=10)
+        ttk.Button(
+            options_window, 
+            text="Close", 
+            command=options_window.destroy, 
+            bootstyle="danger"
+        ).pack(pady=10)
+        return
+
     # Generate three unique options
     generated_passwords = set()
     while len(generated_passwords) < 3:
         strengthened_password = strengthen_password_to_strength(current_password, desired_strength)
-        generated_passwords.add(strengthened_password)
+        if not strengthened_password.startswith("⚠️"):
+            generated_passwords.add(strengthened_password)
 
     for password in generated_passwords:
         ttk.Button(
