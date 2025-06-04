@@ -2,7 +2,7 @@ import tkinter as tk
 from tkinter import ttk
 import math
 
-style = Style()
+style = ttk.Style()
 
 root = tk.Tk()
 root.title("Tom Kirby's Password checker")
