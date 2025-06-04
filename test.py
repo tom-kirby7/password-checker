@@ -197,6 +197,83 @@ def strengthen_password(password):
     # Return only the original password with appended characters
     return strengthened_password[:len(password)] + strengthened_password[len(password):]
 
+def strengthen_password_to_strength(password, desired_strength):
+    """Strengthen the password to the desired strength level."""
+    if not password:
+        return "❌ Please provide a password to strengthen."
+
+    strengthened_password = password
+    attempts = 0
+
+    # Define relative thresholds for each strength level
+    thresholds = {
+        "Weak": 30,  # 30% strength
+        "Moderate": 50,  # 50% strength
+        "Strong": 75,  # 75% strength
+        "Very Strong": 95  # 95% strength
+    }
+
+    target_percent = thresholds.get(desired_strength, 95)  # Default to "Very Strong"
+    while attempts < 50:  # Limit attempts to avoid infinite loops
+        score, *_ = total_score(strengthened_password)
+        percent = (score / 30) * 100  # Convert score to percentage
+        if percent >= target_percent:
+            break
+
+        strengthened_password = strengthen_password(strengthened_password)
+        attempts += 1
+
+    return strengthened_password
+
+def show_strengthen_options():
+    """Show three password options after strengthening."""
+    current_password = password_entry.get()
+    if not current_password:
+        result_label.config(text="❌ Please enter a password to strengthen.")
+        return
+
+    desired_strength = mode_var.get()
+    options_window = ttk.Toplevel(root)
+    options_window.title("Choose a Strengthened Password")
+    options_window.geometry("400x250")
+
+    ttk.Label(
+        options_window, 
+        text=f"Choose a password strengthened to {desired_strength}:", 
+        font=("Segoe UI", 12)
+    ).pack(pady=10)
+
+    # Generate three unique options
+    generated_passwords = set()
+    while len(generated_passwords) < 3:
+        strengthened_password = strengthen_password_to_strength(current_password, desired_strength)
+        generated_passwords.add(strengthened_password)
+
+    for password in generated_passwords:
+        ttk.Button(
+            options_window, 
+            text=password, 
+            command=lambda pw=password: select_strengthened_password(pw, options_window), 
+            bootstyle="primary"
+        ).pack(pady=5)
+
+def select_strengthened_password(password, window):
+    """Select a strengthened password and populate it in the password checker."""
+    password_entry.delete(0, 'end')
+    password_entry.insert(0, password)
+    window.destroy()
+    check_password()
+
+def show_strengthen_ui():
+    """Show the UI for selecting strength and options after pressing 'Strengthen Password'."""
+    global strengthen_ui_visible
+    if not strengthen_ui_visible:
+        strengthen_frame.grid(row=3, column=0, columnspan=4, pady=(10, 15), sticky="ew")
+        strengthen_ui_visible = True
+    else:
+        strengthen_frame.grid_remove()
+        strengthen_ui_visible = False
+
 # --- UI Update Functions ---
 def check_password(event=None):
     password = password_entry.get()
@@ -283,7 +360,6 @@ def toggle_generator_ui():
 frame = ttk.Frame(root, padding=12)
 frame.pack(fill=BOTH, expand=YES)
 
-
 # Password Entry & Copy Button
 ttk.Label(frame, text="Enter Password:").grid(row=0, column=0, sticky=W)
 password_entry = ttk.Entry(frame, width=30, show="•")
@@ -302,27 +378,40 @@ generate_check = ttk.Checkbutton(frame, text="Generate Password", variable=gener
                                  command=toggle_generator_ui)
 generate_check.grid(row=1, column=0, columnspan=4, sticky=W, pady=(10,5))
 
-# Add Auto-Strengthen Button
-auto_strengthen_button = ttk.Button(
-    frame, 
-    text="Auto-Strengthen", 
-    command=lambda: auto_strengthen_password(), 
+# Strengthen Password Button
+strengthen_password_button = ttk.Button(
+    frame,
+    text="Strengthen Password",
+    command=show_strengthen_ui,
     bootstyle="success"
 )
-auto_strengthen_button.grid(row=1, column=3, sticky=W, padx=(5, 10))
+strengthen_password_button.grid(row=2, column=0, columnspan=4, sticky=W, pady=(10, 5))
 
-def auto_strengthen_password():
-    """Automatically strengthen the password and update the UI."""
-    current_password = password_entry.get()
-    if not current_password:
-        result_label.config(text="❌ Please enter a password to strengthen.")
-        return
+# Strengthen UI Frame (hidden initially)
+strengthen_ui_visible = False
+strengthen_frame = ttk.Frame(frame)
+strengthen_frame.grid(row=3, column=0, columnspan=4, pady=(10, 15), sticky="ew")
+strengthen_frame.grid_remove()
 
-    strengthened_password = strengthen_password(current_password)
-    password_entry.delete(0, 'end')
-    password_entry.insert(0, strengthened_password)
-    result_label.config(text="✅ Password has been strengthened.")
-    check_password()
+# Strengthen To Dropdown
+ttk.Label(strengthen_frame, text="Strengthen To:", font=("Segoe UI", 12)).grid(row=1, column=0, sticky=W, padx=(5, 5))
+strengthen_mode_combo = ttk.Combobox(
+    strengthen_frame,
+    textvariable=mode_var,
+    values=["Weak", "Moderate", "Strong", "Very Strong"],
+    state="readonly",
+    width=12
+)
+strengthen_mode_combo.grid(row=1, column=1, sticky=W, padx=(5, 5))
+
+# Strengthen Options Button
+strengthen_options_button = ttk.Button(
+    strengthen_frame,
+    text="Strengthen Options",
+    command=show_strengthen_options,
+    bootstyle="primary"
+)
+strengthen_options_button.grid(row=1, column=2, sticky=W, padx=(5, 10))
 
 # Generator UI Frame (hidden initially)
 gen_frame = ttk.Frame(frame)
@@ -351,15 +440,15 @@ generate_button.grid(row=0, column=5, sticky=W)
 
 # Result Label
 result_label = ttk.Label(frame, text="")
-result_label.grid(row=2, column=0, columnspan=4, pady=(5,10), sticky=W)
+result_label.grid(row=4, column=0, columnspan=4, pady=(5,10), sticky=W)
 
 # --- Meter ---
 meter_widget = ttk.Meter(frame, amountused=0, subtext="0% Strength", bootstyle="danger")
-meter_widget.grid(row=4, column=0, columnspan=4, pady=(10,20), sticky="ew")
+meter_widget.grid(row=5, column=0, columnspan=4, pady=(10,20), sticky="ew")
 
 # --- Category Bars ---
 cat_frame = ttk.Frame(frame)
-cat_frame.grid(row=5, column=0, columnspan=4, sticky=W)
+cat_frame.grid(row=6, column=0, columnspan=4, sticky=W)
 
 ttk.Label(cat_frame, text="Length:").grid(row=0, column=0, sticky=W)
 length_bar = ttk.Progressbar(cat_frame, length=160, maximum=10, mode='determinate', bootstyle="secondary")
@@ -387,10 +476,10 @@ sequence_score_label.grid(row=3, column=2, sticky=W)
 
 # --- Help and About Buttons ---
 help_button = ttk.Button(frame, text="Help", command=show_help)
-help_button.grid(row=6, column=2, sticky=E, padx=5, pady=10)
+help_button.grid(row=7, column=2, sticky=E, padx=5, pady=10)
 
 about_button = ttk.Button(frame, text="About", command=show_about)
-about_button.grid(row=6, column=3, sticky=E, padx=5, pady=10)
+about_button.grid(row=7, column=3, sticky=E, padx=5, pady=10)
 
 # --- Menu Bar ---
 menubar = ttk.Menu(root)
