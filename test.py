@@ -40,14 +40,33 @@ def score_variety(password):
     return {1: 2.5, 2: 5, 3: 7.5, 4: 10}.get(types_used, 0)
 
 def score_entropy(password):
+    """Calculate the entropy of the password, considering repeated patterns."""
     charset_size = 0
     if any(c.islower() for c in password): charset_size += 26
     if any(c.isupper() for c in password): charset_size += 26
     if any(c.isdigit() for c in password): charset_size += 10
     if any(not c.isalnum() for c in password): charset_size += 33
     if charset_size == 0 or len(password) == 0: return 0
-    entropy = len(password) * math.log2(charset_size)
-    return min(entropy / 6, 10)
+
+    # Calculate Shannon entropy
+    frequency = {char: password.count(char) for char in set(password)}
+    shannon_entropy = -sum((freq / len(password)) * math.log2(freq / len(password)) for freq in frequency.values())
+
+    # Penalize for repeated patterns
+    max_pattern_length = len(password) // 2
+    pattern_penalty = 0
+    for pattern_length in range(1, max_pattern_length + 1):
+        for i in range(len(password) - pattern_length + 1):
+            pattern = password[i:i + pattern_length]
+            occurrences = password.count(pattern)
+            if occurrences > 1:
+                pattern_penalty += (occurrences - 1) * pattern_length * 0.1
+
+    # Calculate final entropy score
+    entropy = shannon_entropy - pattern_penalty
+    max_entropy = math.log2(charset_size) * len(password)
+    normalized_entropy = max(entropy / max_entropy * 10, 0)  # Normalize to a 0-10 scale
+    return min(normalized_entropy, 10)
 
 def score_keyboard_sequence(password):
     """Calculate the penalty for common sequences in the password."""
@@ -376,28 +395,113 @@ def copy_to_clipboard():
     password = password_entry.get()
     if password:
         root.clipboard_clear()
-        root.clipboard_append(password)
-        root.update()
-
 def show_help():
+    """Display the Help window with categorized dropdowns and scrollable content."""
     help_window = ttk.Toplevel(root)
     help_window.title("Help")
-    help_window.geometry("400x200")
-    ttk.Label(help_window, text=(
-        "Enter a password to check its strength.\n"
-        "Strength is based on length, variety, entropy, and penalties.\n\n"
-        "Click 'Generate Password' to create a strong password."), justify="left").pack(padx=10, pady=10)
-    ttk.Button(help_window, text="Close", command=help_window.destroy, bootstyle="primary").pack(pady=10)
+    help_window.geometry("460x300")
+
+    # Create a scrollable frame
+    canvas = ttk.Canvas(help_window)
+    scrollbar = ttk.Scrollbar(help_window, orient=VERTICAL, command=canvas.yview)
+    scrollable_frame = ttk.Frame(canvas)
+
+    scrollable_frame.bind(
+        "<Configure>",
+        lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+    )
+
+    canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+    canvas.configure(yscrollcommand=scrollbar.set)
+
+    canvas.pack(side=LEFT, fill=BOTH, expand=YES)
+    scrollbar.pack(side=RIGHT, fill=Y)
+
+    # Section 1: How to Use
+    how_to_use = ttk.Labelframe(scrollable_frame, text="🔍 HOW TO USE", padding=10)
+    how_to_use.pack(fill=X, expand=YES, pady=5)
+    ttk.Label(how_to_use, text=(
+        "Enter a password in the text field to check its strength.\n"
+        "Password strength is evaluated based on:\n"
+        "- Length\n"
+        "- Variety of characters (lowercase, uppercase, digits, symbols)\n"
+        "- Entropy (randomness and uniqueness)\n"
+        "- Penalties for common sequences or weak patterns."
+    ), justify="left", wraplength=440).pack()
+
+    # Section 2: Features
+    features = ttk.Labelframe(scrollable_frame, text="🛠 FEATURES", padding=10)
+    features.pack(fill=X, expand=YES, pady=5)
+    ttk.Label(features, text=(
+        "- 'Generate Password': Creates a secure password based on difficulty.\n"
+        "- 'Strengthen Password': Improves your entered password.\n"
+        "- Visual meter: Shows strength from red (weak) to green (strong).\n"
+        "- Detailed score breakdown: Length, Variety, Entropy, and Penalties."
+    ), justify="left", wraplength=440).pack()
+
+    # Section 3: Tips
+    tips = ttk.Labelframe(scrollable_frame, text="🔒 TIPS", padding=10)
+    tips.pack(fill=X, expand=YES, pady=5)
+    ttk.Label(tips, text=(
+        "- Avoid common words like 'password' or '123'.\n"
+        "- Use symbols, numbers, and mix cases.\n"
+        "- Aim for at least 12 characters."
+    ), justify="left", wraplength=440).pack()
+
+    ttk.Button(scrollable_frame, text="Close", command=help_window.destroy, bootstyle="primary").pack(pady=10)
 
 def show_about():
+    """Display the About window with categorized dropdowns and scrollable content."""
     about_window = ttk.Toplevel(root)
     about_window.title("About")
-    about_window.geometry("400x150")
-    ttk.Label(about_window, text=(
-        "Password Checker v1.0\n"
-        "Created by Tom Kirby\n"
-        "Evaluate or generate secure passwords."), justify="center").pack(padx=10, pady=10)
-    ttk.Button(about_window, text="Close", command=about_window.destroy, bootstyle="primary").pack(pady=10)
+    about_window.geometry("460x300")
+
+    # Create a scrollable frame
+    canvas = ttk.Canvas(about_window)
+    scrollbar = ttk.Scrollbar(about_window, orient=VERTICAL, command=canvas.yview)
+    scrollable_frame = ttk.Frame(canvas)
+
+    scrollable_frame.bind(
+        "<Configure>",
+        lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+    )
+
+    canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+    canvas.configure(yscrollcommand=scrollbar.set)
+
+    canvas.pack(side=LEFT, fill=BOTH, expand=YES)
+    scrollbar.pack(side=RIGHT, fill=Y)
+
+    # Section 1: Application Info
+    app_info = ttk.Labelframe(scrollable_frame, text="🔐 APPLICATION INFO", padding=10)
+    app_info.pack(fill=X, expand=YES, pady=5)
+    ttk.Label(app_info, text=(
+        "This application helps users evaluate and strengthen passwords.\n\n"
+        "📦 Version: 1.0\n"
+        "👨‍💻 Developer: Tom Kirby"
+    ), justify="left", wraplength=440).pack()
+
+    # Section 2: Technology
+    technology = ttk.Labelframe(scrollable_frame, text="📘 TECHNOLOGY", padding=10)
+    technology.pack(fill=X, expand=YES, pady=5)
+    ttk.Label(technology, text=(
+        "- Built using Python and the ttkbootstrap GUI library.\n"
+        "- Evaluates password strength using:\n"
+        "   • Length score (up to 10 points)\n"
+        "   • Variety score (lower/upper/digit/symbol)\n"
+        "   • Entropy score (based on Shannon entropy)\n"
+        "   • Sequence penalty (e.g., '123', 'abc', common passwords)."
+    ), justify="left", wraplength=440).pack()
+
+    # Section 3: Disclaimer
+    disclaimer = ttk.Labelframe(scrollable_frame, text="📝 DISCLAIMER", padding=10)
+    disclaimer.pack(fill=X, expand=YES, pady=5)
+    ttk.Label(disclaimer, text=(
+        "This tool is for educational purposes. For secure applications,\n"
+        "use industry-standard password managers and hashing methods."
+    ), justify="left", wraplength=440).pack()
+
+    ttk.Button(scrollable_frame, text="Close", command=about_window.destroy, bootstyle="primary").pack(pady=10)
 
 def toggle_generator_ui():
     global gen_visible
