@@ -39,35 +39,6 @@ def score_variety(password):
     types_used = sum([has_lower, has_upper, has_digit, has_symbol])
     return {1: 2.5, 2: 5, 3: 7.5, 4: 10}.get(types_used, 0)
 
-def score_entropy(password):
-    """Calculate the entropy of the password, considering repeated patterns."""
-    charset_size = 0
-    if any(c.islower() for c in password): charset_size += 26
-    if any(c.isupper() for c in password): charset_size += 26
-    if any(c.isdigit() for c in password): charset_size += 10
-    if any(not c.isalnum() for c in password): charset_size += 33
-    if charset_size == 0 or len(password) == 0: return 0
-
-    # Calculate Shannon entropy
-    frequency = {char: password.count(char) for char in set(password)}
-    shannon_entropy = -sum((freq / len(password)) * math.log2(freq / len(password)) for freq in frequency.values())
-
-    # Penalize for repeated patterns
-    max_pattern_length = len(password) // 2
-    pattern_penalty = 0
-    for pattern_length in range(1, max_pattern_length + 1):
-        for i in range(len(password) - pattern_length + 1):
-            pattern = password[i:i + pattern_length]
-            occurrences = password.count(pattern)
-            if occurrences > 1:
-                pattern_penalty += (occurrences - 1) * pattern_length * 0.1
-
-    # Calculate final entropy score
-    entropy = shannon_entropy - pattern_penalty
-    max_entropy = math.log2(charset_size) * len(password)
-    normalized_entropy = max(entropy / max_entropy * 10, 0)  # Normalize to a 0-10 scale
-    return min(normalized_entropy, 10)
-
 def score_keyboard_sequence(password):
     """Calculate the penalty for common sequences in the password."""
     common_seqs = ["123", "234", "345", "456", "567", "678", "789", "890",
@@ -85,12 +56,11 @@ def total_score(password):
     """Calculate the total score for the password."""
     length_score = score_length(password)
     variety_score = score_variety(password)
-    entropy_score = score_entropy(password)
     seq_penalty = score_keyboard_sequence(password)
 
-    base_score = length_score + variety_score + entropy_score
+    base_score = length_score + variety_score
     total = base_score - seq_penalty
-    return max(total, 0), length_score, variety_score, entropy_score, seq_penalty  # Ensure total is not negative
+    return max(total, 0), length_score, variety_score, seq_penalty  # Ensure total is not negative
 
 def strength_label(score):
     if score <= 9: return "Very Weak"
@@ -115,6 +85,7 @@ def get_bootstyle(score, penalty=False):
 
 # --- Password Generator ---
 def perform_generate_password():
+    """Generate a password based on the selected mode and length."""
     mode = mode_var.get()
     length = length_var.get()
 
@@ -126,7 +97,7 @@ def perform_generate_password():
         charset = string.ascii_letters + string.digits
         min_types = 2
         min_score = 20
-    else:
+    else:  # Hard mode
         charset = string.ascii_letters + string.digits + "!@#$%^&*()-_=+[]{}|;:,.<>?"
         min_types = 4
         min_score = 30
@@ -136,13 +107,14 @@ def perform_generate_password():
         attempts += 1
         password_chars = []
 
+        # Ensure minimum character type requirements
         if mode == "Easy":
             password_chars += random.choices(string.ascii_lowercase, k=length)
         elif mode == "Medium":
             password_chars += random.choices(string.ascii_lowercase, k=max(1, length // 3))
             password_chars += random.choices(string.ascii_uppercase, k=max(1, length // 4))
             password_chars += random.choices(string.digits, k=max(1, length // 4))
-        else:
+        else:  # Hard mode
             reqs = {
                 string.ascii_lowercase: 2,
                 string.ascii_uppercase: 2,
@@ -157,8 +129,11 @@ def perform_generate_password():
         random.shuffle(password_chars)
         password = ''.join(password_chars[:length])
 
-        if password in prohibited_passwords: continue
-        if any(seq in password.lower() for seq in ["123", "abc", "password", "qwe"]): continue
+        # Check if the password meets criteria
+        if password in prohibited_passwords:
+            continue
+        if any(seq in password.lower() for seq in ["123", "abc", "password", "qwe"]):
+            continue
 
         types_used = sum([
             any(c.islower() for c in password),
@@ -166,7 +141,8 @@ def perform_generate_password():
             any(c.isdigit() for c in password),
             any(not c.isalnum() for c in password),
         ])
-        if types_used < min_types: continue
+        if types_used < min_types:
+            continue
 
         score, *_ = total_score(password)
         if score >= min_score:
@@ -186,7 +162,7 @@ def strengthen_password(password):
     charset = string.ascii_letters + string.digits + "!@#$%^&*()-_=+[]{}|;:,.<>?"
 
     # Analyze the current password's scores
-    score, len_score, var_score, ent_score, seq_penalty = total_score(strengthened_password)
+    score, len_score, var_score, seq_penalty = total_score(strengthened_password)
 
     # Improve variety by appending missing character types
     if var_score < 10:
@@ -199,11 +175,6 @@ def strengthen_password(password):
         if not any(not c.isalnum() for c in strengthened_password):
             strengthened_password += random.choice("!@#$%^&*()-_=+[]{}|;:,.<>?")
 
-    # Improve entropy by appending random characters if needed
-    if ent_score < 10:
-        additional_entropy = ''.join(random.choices(charset, k=2))
-        strengthened_password += additional_entropy
-
     # Ensure the password meets the minimum length
     min_length = 12  # Minimum recommended length for a strong password
     while len(strengthened_password) < min_length:
@@ -213,7 +184,6 @@ def strengthen_password(password):
     if any(seq in strengthened_password.lower() for seq in ["123", "abc", "password", "qwe"]):
         strengthened_password += random.choice("!@#$")
 
-    # Return only the original password with appended characters
     return strengthened_password[:len(password)] + strengthened_password[len(password):]
 
 def strengthen_password_to_strength(password, desired_strength):
@@ -230,7 +200,7 @@ def strengthen_password_to_strength(password, desired_strength):
     }
 
     target_percent = thresholds.get(desired_strength, 95)  # Default to "Very Strong"
-    score, len_score, var_score, ent_score, seq_penalty = total_score(password)
+    score, len_score, var_score, seq_penalty = total_score(password)
     current_percent = (score / 30) * 100  # Convert score to percentage
 
     # Check if the password is already stronger than the desired mode
@@ -241,7 +211,7 @@ def strengthen_password_to_strength(password, desired_strength):
     attempts = 0
 
     while attempts < 50:  # Limit attempts to avoid infinite loops
-        score, len_score, var_score, ent_score, seq_penalty = total_score(strengthened_password)
+        score, len_score, var_score, seq_penalty = total_score(strengthened_password)
         current_percent = (score / 30) * 100  # Convert score to percentage
 
         if current_percent >= target_percent:
@@ -257,10 +227,6 @@ def strengthen_password_to_strength(password, desired_strength):
                 strengthened_password += random.choice(string.digits)
             if not any(not c.isalnum() for c in strengthened_password):
                 strengthened_password += random.choice("!@#$%^&*()-_=+[]{}|;:,.<>?")
-
-        # Improve entropy by appending random characters if needed
-        if ent_score < (target_percent / 10):  # Adjust entropy relative to the target strength
-            strengthened_password += ''.join(random.choices(string.ascii_letters + string.digits + "!@#$%^&*()-_=+[]{}|;:,.<>?", k=2))
 
         # Ensure the password meets the minimum length relative to the target strength
         min_length = 8 if target_percent <= 50 else 12  # Moderate and below: 8, Strong and above: 12
@@ -353,11 +319,11 @@ def check_password(event=None):
         clear_category_scores()
         return
 
-    score, len_score, var_score, ent_score, seq_penalty = total_score(password)
+    score, len_score, var_score, seq_penalty = total_score(password)
     label = strength_label(score)
     result_label.config(text=f"Password Strength: {label}{' (Penalty for sequence!)' if seq_penalty else ''}")
     update_meter(score, meter_bootstyle(score))
-    update_category_scores(len_score, var_score, ent_score, seq_penalty)
+    update_category_scores(len_score, var_score, seq_penalty)
 
 def update_meter(score, style):
     """Update the meter widget with the score and corresponding style."""
@@ -367,17 +333,15 @@ def update_meter(score, style):
 def clear_category_scores():
     for bar, label in [(length_bar, length_score_label), 
                        (variety_bar, variety_score_label), 
-                       (entropy_bar, entropy_score_label), 
                        (sequence_bar, sequence_score_label)]:
         bar.configure(value=0, bootstyle="secondary")
         label.config(text="0")
 
-def update_category_scores(len_score, var_score, ent_score, seq_penalty):
+def update_category_scores(len_score, var_score, seq_penalty):
     """Update the UI for category scores with distinct colors."""
-    # Update length, variety, and entropy with light blue
+    # Update length and variety with light blue
     length_bar.configure(value=len_score, bootstyle="info")
     variety_bar.configure(value=var_score, bootstyle="info")
-    entropy_bar.configure(value=ent_score, bootstyle="info")
 
     # Update sequence penalty with red
     sequence_bar.configure(value=seq_penalty, bootstyle="danger")
@@ -385,7 +349,6 @@ def update_category_scores(len_score, var_score, ent_score, seq_penalty):
     # Update labels
     length_score_label.config(text=f"{int(len_score)}")
     variety_score_label.config(text=f"{int(var_score)}")
-    entropy_score_label.config(text=f"{int(ent_score)}")
     sequence_score_label.config(text=f"-{int(seq_penalty)}" if seq_penalty else "0")
 
 def toggle_password_visibility():
@@ -425,7 +388,6 @@ def show_help():
         "Password strength is evaluated based on:\n"
         "- Length\n"
         "- Variety of characters (lowercase, uppercase, digits, symbols)\n"
-        "- Entropy (randomness and uniqueness)\n"
         "- Penalties for common sequences or weak patterns."
     ), justify="left", wraplength=440).pack()
 
@@ -436,7 +398,7 @@ def show_help():
         "- 'Generate Password': Creates a secure password based on difficulty.\n"
         "- 'Strengthen Password': Improves your entered password.\n"
         "- Visual meter: Shows strength from red (weak) to green (strong).\n"
-        "- Detailed score breakdown: Length, Variety, Entropy, and Penalties."
+        "- Detailed score breakdown: Length, Variety, and Penalties."
     ), justify="left", wraplength=440).pack()
 
     # Section 3: Tips
@@ -489,7 +451,6 @@ def show_about():
         "- Evaluates password strength using:\n"
         "   • Length score (up to 10 points)\n"
         "   • Variety score (lower/upper/digit/symbol)\n"
-        "   • Entropy score (based on Shannon entropy)\n"
         "   • Sequence penalty (e.g., '123', 'abc', common passwords)."
     ), justify="left", wraplength=440).pack()
 
@@ -617,17 +578,11 @@ variety_bar.grid(row=1, column=1, sticky=W, padx=(5,5))
 variety_score_label = ttk.Label(cat_frame, text="0", width=3)
 variety_score_label.grid(row=1, column=2, sticky=W)
 
-ttk.Label(cat_frame, text="Entropy:").grid(row=2, column=0, sticky=W)
-entropy_bar = ttk.Progressbar(cat_frame, length=160, maximum=10, mode='determinate', bootstyle="secondary")
-entropy_bar.grid(row=2, column=1, sticky=W, padx=(5,5))
-entropy_score_label = ttk.Label(cat_frame, text="0", width=3)
-entropy_score_label.grid(row=2, column=2, sticky=W)
-
-ttk.Label(cat_frame, text="Sequence Penalty:").grid(row=3, column=0, sticky=W)
+ttk.Label(cat_frame, text="Sequence Penalty:").grid(row=2, column=0, sticky=W)
 sequence_bar = ttk.Progressbar(cat_frame, length=160, maximum=10, mode='determinate', bootstyle="secondary")
-sequence_bar.grid(row=3, column=1, sticky=W, padx=(5,5))
+sequence_bar.grid(row=2, column=1, sticky=W, padx=(5,5))
 sequence_score_label = ttk.Label(cat_frame, text="0", width=3)
-sequence_score_label.grid(row=3, column=2, sticky=W)
+sequence_score_label.grid(row=2, column=2, sticky=W)
 
 # --- Help and About Buttons ---
 help_button = ttk.Button(frame, text="Help", command=show_help)
