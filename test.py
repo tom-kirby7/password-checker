@@ -10,7 +10,7 @@ root.geometry("720x500")
 root.minsize(450, 350)
 
 # --- Variables ---
-mode_var = ttk.StringVar(value="Medium")
+mode_var = ttk.StringVar(value="Moderate")  # Default to "Moderate"
 length_var = ttk.IntVar(value=12)
 show_password_var = ttk.BooleanVar(value=False)
 generate_mode_var = ttk.BooleanVar(value=False)
@@ -204,9 +204,8 @@ def strengthen_password_to_strength(password, desired_strength):
 
     # Define relative thresholds for each strength level
     thresholds = {
-        "Weak": (20, 40),  # 20-40% strength
-        "Moderate": (50, 60),  # 50-60% strength
-        "Strong": (70, 90),  # 70-90% strength
+        "Moderate": (60, 75),  # 60-75% strength
+        "Strong": (75, 90),  # 75-90% strength
         "Very Strong": (90, 100)  # 90-100% strength
     }
 
@@ -240,7 +239,7 @@ def strengthen_password_to_strength(password, desired_strength):
                 strengthened_password += random.choice("!@#$%^&*()-_=+[]{}|;:,.<>?")
 
         # Ensure the password meets the minimum length relative to the target strength
-        min_length = 8 if target_range[1] <= 60 else 12  # Moderate and below: 8, Strong and above: 12
+        min_length = 8 if target_range[1] <= 75 else 12  # Moderate and below: 8, Strong and above: 12
         while len(strengthened_password) < min_length:
             strengthened_password += random.choice(string.ascii_letters + string.digits)
 
@@ -525,7 +524,7 @@ ttk.Label(strengthen_frame, text="Strengthen To:", font=("Segoe UI", 12)).grid(r
 strengthen_mode_combo = ttk.Combobox(
     strengthen_frame,
     textvariable=mode_var,
-    values=["Weak", "Moderate", "Strong", "Very Strong"],
+    values=["Moderate", "Strong", "Very Strong"],  # Updated modes
     state="readonly",
     width=12
 )
