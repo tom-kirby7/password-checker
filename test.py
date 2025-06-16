@@ -224,8 +224,9 @@ def strengthen_password_to_strength(password, desired_strength):
         score, len_score, var_score, seq_penalty = total_score(strengthened_password)
         current_percent = score  # Score is already out of 100
 
+        # Ensure the strengthened password is within the target range
         if target_range[0] <= current_percent <= target_range[1]:
-            break
+            return strengthened_password
 
         # Append characters based on missing components
         if var_score < 10:
@@ -245,7 +246,37 @@ def strengthen_password_to_strength(password, desired_strength):
 
         attempts += 1
 
+    # Return the strengthened password even if it doesn't perfectly match the range after 50 attempts
     return strengthened_password
+
+def generate_feedback(password):
+    """Generate feedback based on the password's scores."""
+    feedback = []
+    score, len_score, var_score, seq_penalty = total_score(password)
+
+    # Feedback for length
+    if len_score < 8:
+        feedback.append("🔑 Consider making your password longer for better security.")
+
+    # Feedback for variety
+    if var_score < 10:
+        feedback.append("🔑 Add more variety to your password (uppercase, lowercase, digits, symbols).")
+
+    # Feedback for sequences
+    if seq_penalty > 0:
+        feedback.append("⚠️ Avoid common sequences like '123', 'abc', or keyboard patterns.")
+
+    # General feedback
+    if score < 60:
+        feedback.append("🔒 Your password is weak. Aim for a higher score by improving length and variety.")
+
+    return feedback
+
+def update_feedback(password):
+    """Update the feedback section based on the password."""
+    feedback = generate_feedback(password)
+    feedback_text = "\n".join(feedback) if feedback else "✅ Your password looks good!"
+    feedback_label.config(text=feedback_text)
 
 def show_strengthen_options():
     """Show three password options after strengthening."""
@@ -321,12 +352,14 @@ def check_password(event=None):
         result_label.config(text="❌ Please enter a password.")
         update_meter(0, "danger")
         clear_category_scores()
+        feedback_label.config(text="❌ Please enter a password to receive feedback.")
         return
 
     if password in prohibited_passwords:
         result_label.config(text="❌ This password is too common or not allowed.")
         update_meter(0, "danger")
         clear_category_scores()
+        feedback_label.config(text="⚠️ This password is too common or not allowed.")
         return
 
     score, len_score, var_score, seq_penalty = total_score(password)
@@ -334,6 +367,7 @@ def check_password(event=None):
     result_label.config(text=f"Password Strength: {label}{' (Penalty for sequence!)' if seq_penalty else ''}")
     update_meter(score, meter_bootstyle(score))
     update_category_scores(len_score, var_score, seq_penalty)
+    update_feedback(password)
 
 def update_meter(score, style):
     """Update the meter widget with the score and corresponding style."""
@@ -498,6 +532,14 @@ copy_button.grid(row=0, column=2, sticky=W, padx=(5,10))
 show_password_check = ttk.Checkbutton(frame, text="Show Password", variable=show_password_var,
                                       command=toggle_password_visibility)
 show_password_check.grid(row=0, column=3, sticky=W)
+
+# Feedback Section
+feedback_frame = ttk.Frame(frame, padding=10)
+feedback_frame.grid(row=0, column=4, rowspan=6, sticky=NSEW, padx=(20, 0))
+
+ttk.Label(feedback_frame, text="Feedback:", font=("Segoe UI", 12, "bold")).pack(anchor=W, pady=(0, 5))
+feedback_label = ttk.Label(feedback_frame, text="", justify=LEFT, wraplength=200)
+feedback_label.pack(anchor=W)
 
 # Generate Password Checkbox
 generate_check = ttk.Checkbutton(frame, text="Generate Password", variable=generate_mode_var,
