@@ -29,15 +29,24 @@ prohibited_passwords = load_prohibited_passwords('prohibited.txt')
 
 # --- Scoring Functions ---
 def score_length(password): 
-    return min(len(password) * 0.5, 10)
+    """Calculate the length score out of 100 with additional penalties for very short passwords."""
+    length = len(password)
+    base_score = min(length * 5, 100)  # Scale length to a maximum of 100
+    if length < 6:  # Penalize very short passwords
+        base_score -= (6 - length) * 10  # Subtract 10 points for each missing character below 6
+    return max(base_score, 0)  # Ensure score is not negative
 
 def score_variety(password):
+    """Calculate the variety score out of 100 with penalties for overly simple passwords."""
     has_lower = any(c.islower() for c in password)
     has_upper = any(c.isupper() for c in password)
     has_digit = any(c.isdigit() for c in password)
     has_symbol = any(not c.isalnum() for c in password)
     types_used = sum([has_lower, has_upper, has_digit, has_symbol])
-    return {1: 2.5, 2: 5, 3: 7.5, 4: 10}.get(types_used, 0)
+    base_score = {1: 25, 2: 50, 3: 75, 4: 100}.get(types_used, 0)  # Scale variety to a maximum of 100
+    if types_used == 1 and len(password) <= 6:  # Penalize overly simple passwords
+        base_score -= 20
+    return max(base_score, 0)  # Ensure score is not negative
 
 def score_keyboard_sequence(password):
     """Calculate the penalty for common sequences in the password."""
@@ -49,31 +58,33 @@ def score_keyboard_sequence(password):
                    "password", "letmein", "admin", "welcome"]
     penalty = 0
     for seq in common_seqs:
-        penalty += password.lower().count(seq) * 5  # Penalize for each occurrence of a sequence
-    return penalty
+        penalty += password.lower().count(seq) * 10  # Penalize more heavily for common sequences
+    return min(penalty, 100)  # Cap penalty at 100
 
 def total_score(password):
-    """Calculate the total score for the password."""
+    """Calculate the total score for the password out of 100."""
     length_score = score_length(password)
     variety_score = score_variety(password)
     seq_penalty = score_keyboard_sequence(password)
 
-    base_score = length_score + variety_score
-    total = base_score - seq_penalty
-    return max(total, 0), length_score, variety_score, seq_penalty  # Ensure total is not negative
+    # Adjust scoring weights
+    weighted_score = (length_score * 0.4) + (variety_score * 0.6) - seq_penalty
+    total = max(weighted_score, 0)  # Ensure total is not negative
+    return total, round(length_score / 10), round(variety_score / 10), round(seq_penalty / 10)
 
 def strength_label(score):
-    if score <= 9: return "Very Weak"
-    elif score <= 15: return "Weak"
-    elif score <= 21: return "Moderate"
-    elif score <= 25.5: return "Strong"
+    """Update strength labels to reflect adjusted scoring."""
+    if score <= 20: return "Very Weak"
+    elif score <= 40: return "Weak"
+    elif score <= 60: return "Moderate"
+    elif score <= 80: return "Strong"
     else: return "Very Strong"
 
 def meter_bootstyle(score):
     """Determine the meter color based on the score."""
-    if score <= 10:
+    if score <= 20:
         return "danger"  # Red
-    elif score <= 20:
+    elif score <= 40:
         return "warning"  # Yellow
     else:
         return "success"  # Green
@@ -92,15 +103,15 @@ def perform_generate_password():
     if mode == "Easy":
         charset = string.ascii_lowercase
         min_types = 1
-        min_score = 10
+        min_score = 20
     elif mode == "Medium":
         charset = string.ascii_letters + string.digits
         min_types = 2
-        min_score = 20
+        min_score = 40
     else:  # Hard mode
         charset = string.ascii_letters + string.digits + "!@#$%^&*()-_=+[]{}|;:,.<>?"
         min_types = 4
-        min_score = 30
+        min_score = 60
 
     attempts = 0
     while attempts < 100:
@@ -187,34 +198,34 @@ def strengthen_password(password):
     return strengthened_password[:len(password)] + strengthened_password[len(password):]
 
 def strengthen_password_to_strength(password, desired_strength):
-    """Strengthen the password to the desired strength level."""
+    """Strengthen the password to the desired strength level relative to its current score."""
     if not password:
         return "❌ Please provide a password to strengthen."
 
     # Define relative thresholds for each strength level
     thresholds = {
-        "Weak": 30,  # 30% strength
-        "Moderate": 50,  # 50% strength
-        "Strong": 75,  # 75% strength
-        "Very Strong": 95  # 95% strength
+        "Weak": (20, 40),  # 20-40% strength
+        "Moderate": (50, 60),  # 50-60% strength
+        "Strong": (70, 90),  # 70-90% strength
+        "Very Strong": (90, 100)  # 90-100% strength
     }
 
-    target_percent = thresholds.get(desired_strength, 95)  # Default to "Very Strong"
+    target_range = thresholds.get(desired_strength, (90, 100))  # Default to "Very Strong"
     score, len_score, var_score, seq_penalty = total_score(password)
-    current_percent = (score / 30) * 100  # Convert score to percentage
+    current_percent = score  # Score is already out of 100
 
-    # Check if the password is already stronger than the desired mode
-    if current_percent >= target_percent:
-        return f"⚠️ Password is already stronger than {desired_strength}."
+    # Check if the password is already within the desired range
+    if target_range[0] <= current_percent <= target_range[1]:
+        return f"⚠️ Password is already within the {desired_strength} range."
 
     strengthened_password = password
     attempts = 0
 
     while attempts < 50:  # Limit attempts to avoid infinite loops
         score, len_score, var_score, seq_penalty = total_score(strengthened_password)
-        current_percent = (score / 30) * 100  # Convert score to percentage
+        current_percent = score  # Score is already out of 100
 
-        if current_percent >= target_percent:
+        if target_range[0] <= current_percent <= target_range[1]:
             break
 
         # Append characters based on missing components
@@ -229,7 +240,7 @@ def strengthen_password_to_strength(password, desired_strength):
                 strengthened_password += random.choice("!@#$%^&*()-_=+[]{}|;:,.<>?")
 
         # Ensure the password meets the minimum length relative to the target strength
-        min_length = 8 if target_percent <= 50 else 12  # Moderate and below: 8, Strong and above: 12
+        min_length = 8 if target_range[1] <= 60 else 12  # Moderate and below: 8, Strong and above: 12
         while len(strengthened_password) < min_length:
             strengthened_password += random.choice(string.ascii_letters + string.digits)
 
@@ -327,7 +338,7 @@ def check_password(event=None):
 
 def update_meter(score, style):
     """Update the meter widget with the score and corresponding style."""
-    percent = (score / 30) * 100
+    percent = score  # Score is already out of 100
     meter_widget.configure(amountused=percent, bootstyle=style, subtext=f"{percent:.0f}% Strength")
 
 def clear_category_scores():
@@ -347,9 +358,9 @@ def update_category_scores(len_score, var_score, seq_penalty):
     sequence_bar.configure(value=seq_penalty, bootstyle="danger")
 
     # Update labels
-    length_score_label.config(text=f"{int(len_score)}")
-    variety_score_label.config(text=f"{int(var_score)}")
-    sequence_score_label.config(text=f"-{int(seq_penalty)}" if seq_penalty else "0")
+    length_score_label.config(text=f"{len_score}")
+    variety_score_label.config(text=f"{var_score}")
+    sequence_score_label.config(text=f"-{seq_penalty}" if seq_penalty else "0")
 
 def toggle_password_visibility():
     password_entry.configure(show="" if show_password_var.get() else "•")
