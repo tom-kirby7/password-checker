@@ -6,7 +6,7 @@ import string
 
 root = ttk.Window(themename="superhero")
 root.title("Tom Kirby's Password Checker")
-root.geometry("720x500")
+root.geometry("820x500")
 root.minsize(450, 350)
 
 # --- Variables ---
@@ -250,7 +250,7 @@ def strengthen_password_to_strength(password, desired_strength):
     return strengthened_password
 
 def generate_feedback(password):
-    """Generate directive feedback based on the password's scores."""
+    """Generate interactive feedback based on the password's scores."""
     pros = []
     cons = []
     score, len_score, var_score, seq_penalty = total_score(password)
@@ -282,13 +282,15 @@ def generate_feedback(password):
         cons.append("⚠️ Avoid common sequences like '123', 'abc', or keyboard patterns.")
 
     # Combine feedback
-    feedback = ["Pros:"] + pros + ["\nCons:"] + cons
+    feedback = ["Pros:"] + pros
+    if cons:
+        feedback += ["\nCons:"] + cons
     return feedback
 
 def update_feedback(password):
     """Update the feedback section based on the password."""
     feedback = generate_feedback(password)
-    feedback_text = "\n".join(feedback) if feedback else "✅ Your password looks good!"
+    feedback_text = "\n".join(feedback) if feedback else "✅ Your password looks perfect! Great job!"
     feedback_label.config(text=feedback_text)
 
 def show_strengthen_options():
