@@ -4,11 +4,14 @@ import math
 import random
 import string
 
-# Change the theme to "cosmo" for a more interactive look
-root = ttk.Window(themename="cosmo")  # Updated theme
+# Change the theme to "flatly" for a consistent look
+root = ttk.Window(themename="flatly")  # Updated theme
 root.title("Tom Kirby's Password Checker")
 root.geometry("820x500")
 root.minsize(450, 350)
+
+# Apply a consistent font and style across the app
+default_font = ("Helvetica", 12)
 
 # --- Variables ---
 mode_var = ttk.StringVar(value="Moderate")  # Default to "Moderate"
@@ -309,7 +312,6 @@ def show_strengthen_options():
     ttk.Label(
         options_window, 
         text=f"Choose a password strengthened to {desired_strength}:", 
-        font=("Segoe UI", 12)
     ).pack(pady=10)
 
     # Check if the password is already stronger than the desired mode
@@ -318,14 +320,12 @@ def show_strengthen_options():
         ttk.Label(
             options_window, 
             text=result, 
-            font=("Segoe UI", 10), 
             foreground="red"
         ).pack(pady=10)
         ttk.Button(
             options_window, 
             text="Close", 
-            command=options_window.destroy, 
-            bootstyle="danger"
+            command=options_window.destroy
         ).pack(pady=10)
         return
 
@@ -340,8 +340,7 @@ def show_strengthen_options():
         ttk.Button(
             options_window, 
             text=password, 
-            command=lambda pw=password: select_strengthened_password(pw, options_window), 
-            bootstyle="primary"
+            command=lambda pw=password: select_strengthened_password(pw, options_window)
         ).pack(pady=5)
 
 def select_strengthened_password(password, window):
@@ -394,17 +393,17 @@ def clear_category_scores():
     for bar, label in [(length_bar, length_score_label), 
                        (variety_bar, variety_score_label), 
                        (sequence_bar, sequence_score_label)]:
-        bar.configure(value=0, bootstyle="secondary")
+        bar.configure(value=0)
         label.config(text="0")
 
 def update_category_scores(len_score, var_score, seq_penalty):
     """Update the UI for category scores with distinct colors."""
     # Update length and variety with light blue
-    length_bar.configure(value=len_score, bootstyle="info")
-    variety_bar.configure(value=var_score, bootstyle="info")
+    length_bar.configure(value=len_score)
+    variety_bar.configure(value=var_score)
 
     # Update sequence penalty with red
-    sequence_bar.configure(value=seq_penalty, bootstyle="danger")
+    sequence_bar.configure(value=seq_penalty)
 
     # Update labels
     length_score_label.config(text=f"{len_score}")
@@ -470,7 +469,7 @@ def show_help():
         "- Aim for at least 12 characters."
     ), justify="left", wraplength=440).pack()
 
-    ttk.Button(scrollable_frame, text="Close", command=help_window.destroy, bootstyle="primary").pack(pady=10)
+    ttk.Button(scrollable_frame, text="Close", command=help_window.destroy).pack(pady=10)
 
 def show_about():
     """Display the About window with categorized dropdowns and scrollable content."""
@@ -522,7 +521,7 @@ def show_about():
         "use industry-standard password managers and hashing methods."
     ), justify="left", wraplength=440).pack()
 
-    ttk.Button(scrollable_frame, text="Close", command=about_window.destroy, bootstyle="primary").pack(pady=10)
+    ttk.Button(scrollable_frame, text="Close", command=about_window.destroy).pack(pady=10)
 
 def toggle_generator_ui():
     global gen_visible
@@ -537,37 +536,36 @@ frame = ttk.Frame(root, padding=12)
 frame.pack(fill=BOTH, expand=YES)
 
 # Password Entry & Copy Button
-ttk.Label(frame, text="Enter Password:", font=("Segoe UI", 12, "bold"), bootstyle="primary").grid(row=0, column=0, sticky=W)
-password_entry = ttk.Entry(frame, width=30, show="•", bootstyle="info")
+ttk.Label(frame, text="Enter Password:").grid(row=0, column=0, sticky=W)
+password_entry = ttk.Entry(frame, width=30, show="•")
 password_entry.grid(row=0, column=1, sticky=W, padx=(5, 0))
 password_entry.bind("<KeyRelease>", check_password)
 
-copy_button = ttk.Button(frame, text="⧉", width=3, command=copy_to_clipboard, bootstyle="secondary")
+copy_button = ttk.Button(frame, text="⧉", width=3, command=copy_to_clipboard)
 copy_button.grid(row=0, column=2, sticky=W, padx=(5, 10))
 
 show_password_check = ttk.Checkbutton(frame, text="Show Password", variable=show_password_var,
-                                      command=toggle_password_visibility, bootstyle="success")
+                                      command=toggle_password_visibility)
 show_password_check.grid(row=0, column=3, sticky=W)
 
 # Feedback Section
 feedback_frame = ttk.Frame(frame, padding=10)
 feedback_frame.grid(row=0, column=4, rowspan=6, sticky=NSEW, padx=(20, 0))
 
-ttk.Label(feedback_frame, text="Feedback:", font=("Segoe UI", 12, "bold"), bootstyle="warning").pack(anchor=W, pady=(0, 5))
-feedback_label = ttk.Label(feedback_frame, text="", justify=LEFT, wraplength=200, bootstyle="light")
+ttk.Label(feedback_frame, text="Feedback:").pack(anchor=W, pady=(0, 5))
+feedback_label = ttk.Label(feedback_frame, text="", justify=LEFT, wraplength=200)
 feedback_label.pack(anchor=W)
 
 # Generate Password Checkbox
 generate_check = ttk.Checkbutton(frame, text="Generate Password", variable=generate_mode_var,
-                                 command=toggle_generator_ui, bootstyle="info")
+                                 command=toggle_generator_ui)
 generate_check.grid(row=1, column=0, columnspan=4, sticky=W, pady=(10, 5))
 
 # Strengthen Password Button
 strengthen_password_button = ttk.Button(
     frame,
     text="Strengthen Password",
-    command=show_strengthen_ui,
-    bootstyle="success"
+    command=show_strengthen_ui
 )
 strengthen_password_button.grid(row=2, column=0, columnspan=4, sticky=W, pady=(10, 5))
 
@@ -578,22 +576,20 @@ strengthen_frame.grid(row=3, column=0, columnspan=4, pady=(10, 15), sticky="ew")
 strengthen_frame.grid_remove()
 
 # Strengthen To Dropdown
-ttk.Label(strengthen_frame, text="Strengthen To:", font=("Segoe UI", 12, "bold"), bootstyle="primary").grid(row=1, column=0, sticky=W, padx=(5, 5))
+ttk.Label(strengthen_frame, text="Strengthen To:").grid(row=1, column=0, sticky=W, padx=(5, 5))
 strengthen_mode_combo = ttk.Combobox(
     strengthen_frame,
     textvariable=mode_var,
     values=["Moderate", "Strong", "Very Strong"],
     state="readonly",
-    width=12,
-    bootstyle="info"
+    width=12
 )
 strengthen_mode_combo.grid(row=1, column=1, sticky=W, padx=(5, 5))
 
 strengthen_options_button = ttk.Button(
     strengthen_frame,
     text="Strengthen Options",
-    command=show_strengthen_options,
-    bootstyle="primary"
+    command=show_strengthen_options
 )
 strengthen_options_button.grid(row=1, column=2, sticky=W, padx=(5, 10))
 
@@ -627,36 +623,36 @@ result_label = ttk.Label(frame, text="")
 result_label.grid(row=4, column=0, columnspan=4, pady=(5,10), sticky=W)
 
 # --- Meter ---
-meter_widget = ttk.Meter(frame, amountused=0, subtext="0% Strength", bootstyle="success")
+meter_widget = ttk.Meter(frame, amountused=0, subtext="0% Strength")
 meter_widget.grid(row=5, column=0, columnspan=4, pady=(10,20), sticky="ew")
 
 # --- Category Bars ---
 cat_frame = ttk.Frame(frame)
 cat_frame.grid(row=6, column=0, columnspan=4, sticky=W)
 
-ttk.Label(cat_frame, text="Length:", font=("Segoe UI", 10, "bold"), bootstyle="info").grid(row=0, column=0, sticky=W)
-length_bar = ttk.Progressbar(cat_frame, length=160, maximum=10, mode='determinate', bootstyle="info")
+ttk.Label(cat_frame, text="Length:").grid(row=0, column=0, sticky=W)
+length_bar = ttk.Progressbar(cat_frame, length=160, maximum=10, mode='determinate')
 length_bar.grid(row=0, column=1, sticky=W, padx=(5,5))
-length_score_label = ttk.Label(cat_frame, text="0", width=3, bootstyle="light")
+length_score_label = ttk.Label(cat_frame, text="0", width=3)
 length_score_label.grid(row=0, column=2, sticky=W)
 
-ttk.Label(cat_frame, text="Variety:", font=("Segoe UI", 10, "bold"), bootstyle="info").grid(row=1, column=0, sticky=W)
-variety_bar = ttk.Progressbar(cat_frame, length=160, maximum=10, mode='determinate', bootstyle="info")
+ttk.Label(cat_frame, text="Variety:").grid(row=1, column=0, sticky=W)
+variety_bar = ttk.Progressbar(cat_frame, length=160, maximum=10, mode='determinate')
 variety_bar.grid(row=1, column=1, sticky=W, padx=(5,5))
-variety_score_label = ttk.Label(cat_frame, text="0", width=3, bootstyle="light")
+variety_score_label = ttk.Label(cat_frame, text="0", width=3)
 variety_score_label.grid(row=1, column=2, sticky=W)
 
-ttk.Label(cat_frame, text="Sequence Penalty:", font=("Segoe UI", 10, "bold"), bootstyle="danger").grid(row=2, column=0, sticky=W)
-sequence_bar = ttk.Progressbar(cat_frame, length=160, maximum=10, mode='determinate', bootstyle="danger")
+ttk.Label(cat_frame, text="Sequence Penalty:").grid(row=2, column=0, sticky=W)
+sequence_bar = ttk.Progressbar(cat_frame, length=160, maximum=10, mode='determinate')
 sequence_bar.grid(row=2, column=1, sticky=W, padx=(5,5))
-sequence_score_label = ttk.Label(cat_frame, text="0", width=3, bootstyle="light")
+sequence_score_label = ttk.Label(cat_frame, text="0", width=3)
 sequence_score_label.grid(row=2, column=2, sticky=W)
 
 # --- Help and About Buttons ---
-help_button = ttk.Button(frame, text="Help", command=show_help, bootstyle="info")
+help_button = ttk.Button(frame, text="Help", command=show_help)
 help_button.grid(row=7, column=2, sticky=E, padx=5, pady=10)
 
-about_button = ttk.Button(frame, text="About", command=show_about, bootstyle="info")
+about_button = ttk.Button(frame, text="About", command=show_about)
 about_button.grid(row=7, column=3, sticky=E, padx=5, pady=10)
 
 # --- Menu Bar ---
