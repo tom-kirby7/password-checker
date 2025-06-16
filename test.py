@@ -250,26 +250,39 @@ def strengthen_password_to_strength(password, desired_strength):
     return strengthened_password
 
 def generate_feedback(password):
-    """Generate feedback based on the password's scores."""
-    feedback = []
+    """Generate directive feedback based on the password's scores."""
+    pros = []
+    cons = []
     score, len_score, var_score, seq_penalty = total_score(password)
 
-    # Feedback for length
-    if len_score < 8:
-        feedback.append("🔑 Consider making your password longer for better security.")
+    # Pros
+    if len(password) >= 12:
+        pros.append("✅ Your password is long enough for strong security.")
+    if any(c.islower() for c in password):
+        pros.append("✅ Includes lowercase letters.")
+    if any(c.isupper() for c in password):
+        pros.append("✅ Includes uppercase letters.")
+    if any(c.isdigit() for c in password):
+        pros.append("✅ Includes numbers.")
+    if any(not c.isalnum() for c in password):
+        pros.append("✅ Includes special characters.")
 
-    # Feedback for variety
-    if var_score < 10:
-        feedback.append("🔑 Add more variety to your password (uppercase, lowercase, digits, symbols).")
-
-    # Feedback for sequences
+    # Cons
+    if len(password) < 12:
+        cons.append("🔑 Consider making your password longer (at least 12 characters).")
+    if not any(c.islower() for c in password):
+        cons.append("🔑 Add lowercase letters for better variety.")
+    if not any(c.isupper() for c in password):
+        cons.append("🔑 Add uppercase letters for better variety.")
+    if not any(c.isdigit() for c in password):
+        cons.append("🔑 Add numbers to strengthen your password.")
+    if not any(not c.isalnum() for c in password):
+        cons.append("🔑 Add special characters like '!@#$%^&*' for enhanced security.")
     if seq_penalty > 0:
-        feedback.append("⚠️ Avoid common sequences like '123', 'abc', or keyboard patterns.")
+        cons.append("⚠️ Avoid common sequences like '123', 'abc', or keyboard patterns.")
 
-    # General feedback
-    if score < 60:
-        feedback.append("🔒 Your password is weak. Aim for a higher score by improving length and variety.")
-
+    # Combine feedback
+    feedback = ["Pros:"] + pros + ["\nCons:"] + cons
     return feedback
 
 def update_feedback(password):
